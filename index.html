@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 會議記錄神器 (MVP)</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; max-width: 800px; margin: auto; }
+    h1 { color: #333; text-align: center; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; resize: vertical; }
+    button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+    button:hover { background-color: #0056b3; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    .topic-item { border-left: 4px solid #007bff; padding: 15px; margin-bottom: 15px; background-color: #f9f9f9; border-radius: 0 5px 5px 0; }
+    .topic-title { font-weight: bold; font-size: 1.2em; margin-bottom: 5px; color: #007bff; }
+    .topic-desc { color: #555; margin-bottom: 10px; }
+    .action-btn { background-color: #28a745; font-size: 14px; margin-right: 5px; }
+    .action-btn:hover { background-color: #218838; }
+    .record-btn { background-color: #dc3545; }
+    .record-btn:hover { background-color: #c82333; }
+    #loading { display: none; color: #007bff; font-weight: bold; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>🎙️ AI 會議記錄神器</h1>
+
+  <div class="card">
+    <h3>1. 貼上會議議程</h3>
+    <textarea id="agendaInput" rows="8" placeholder="請將會議開會通知單或議程直接貼在此處..."></textarea>
+    <button id="analyzeBtn" onclick="analyzeAgenda()">🤖 AI 自動拆解議題</button>
+    <div id="loading">系統正在努力拆解議程中，請稍候...</div>
+  </div>
+
+  <div class="card" id="meetingSection" style="display:none;">
+    <h3>2. 會議進行中 (點擊朗讀)</h3>
+    <div id="topicList"></div>
+  </div>
+
+  <script>
+    // 【重要】將這裡替換成您剛剛從 GAS 複製下來的 Web App URL
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxybu-JD2_lqC0OWAZWAkDIJm0zAjkVXKRW0QhaKafsCG5M-BAYKbP9yrxZFq9IfOXd/exec";
+
+    async function analyzeAgenda() {
+      const text = document.getElementById('agendaInput').value;
+      if (!text.trim()) {
+        alert("請先貼上議程內容！");
+        return;
+      }
+
+      const btn = document.getElementById('analyzeBtn');
+      const loading = document.getElementById('loading');
+      btn.disabled = true;
+      loading.style.display = "block";
+
+      try {
+        // 發送請求給 GAS
+        // 注意：這裡省略 Content-Type，讓它以 text/plain 發送，避免引發 CORS 預檢錯誤
+        const response = await fetch(GAS_WEBAPP_URL, {
+          method: 'POST',
+          body: JSON.stringify({ agendaText: text }) 
+        });
+
+        const topics = await response.json();
+        
+        if(topics.error) {
+           alert("後端發生錯誤：" + topics.error);
+           return;
+        }
+
+        renderTopics(topics);
+        document.getElementById('meetingSection').style.display = "block";
+
+      } catch (error) {
+        alert("發生錯誤：" + error.message);
+      } finally {
+        btn.disabled = false;
+        loading.style.display = "none";
+      }
+    }
+
+    function renderTopics(topics) {
+      const listDiv = document.getElementById('topicList');
+      listDiv.innerHTML = ''; // 清空舊資料
+
+      topics.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'topic-item';
+        div.innerHTML = `
+          <div class="topic-title">議題 ${index + 1}：${item.topic}</div>
+          <div class="topic-desc">${item.description}</div>
+          <button class="action-btn" onclick="speakText('${item.topic}。說明：${item.description}')">🔊 朗讀議題</button>
+          <button class="action-btn record-btn" onclick="alert('錄音與摘要功能將於下一階段實作！')">🎤 開始討論(錄音)</button>
+        `;
+        listDiv.appendChild(div);
+      });
+    }
+
+    // 瀏覽器內建的文字轉語音 (TTS) 功能
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // 停止先前的朗讀
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW'; // 設定為台灣中文
+        utterance.rate = 1.0;     // 語速
+        window.speechSynthesis.speak(utterance);
+      } else {
+        alert("您的瀏覽器不支援語音朗讀功能。");
+      }
+    }
+  </script>
+</body>
+</html>
