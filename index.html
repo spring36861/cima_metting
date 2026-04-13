@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CIMA 數位會議紀錄系統 2.2</title>
+  <title>CIMA 數位會議紀錄系統 2.3</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
     html { scroll-behavior: smooth; } 
@@ -17,6 +17,7 @@
     .btn-danger { background: #dc3545; color: white; }
     .btn-success { background: #28a745; color: white; }
     .btn-outline { background: transparent; border: 2px dashed var(--primary); color: var(--primary); width: 100%; margin-top: 10px; }
+    .btn-outline:hover { background: var(--primary); color: white; }
     
     .page { display: none; }
     .page.active { display: block; }
@@ -61,8 +62,7 @@
 <div id="addTopicModal" class="modal-overlay">
   <div class="modal-box">
     <h3>➕ 手動新增議題</h3>
-    <select id="modalCategory">
-      </select>
+    <select id="modalCategory"></select>
     <input type="text" id="modalTopicName" placeholder="輸入議題案由...">
     <div style="text-align: right;">
       <button onclick="closeAddModal()" style="margin-right: 10px; padding: 8px 15px; border: 1px solid #ccc; background: white; border-radius: 4px;">取消</button>
@@ -79,9 +79,14 @@
 
   <div id="page-list" class="page active">
     <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <h2 style="margin: 0;">歷史會議紀錄</h2>
-        <button class="btn-primary" onclick="showPage('page-import')">+ 新增會議解析</button>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="importInput" accept=".json" style="display: none;" onchange="importData(event)">
+          <button class="btn-outline" style="width: auto; margin: 0; padding: 6px 12px; border-style: solid;" onclick="document.getElementById('importInput').click()">📥 導入紀錄</button>
+          <button class="btn-outline" style="width: auto; margin: 0; padding: 6px 12px; border-style: solid;" onclick="exportData()">📤 導出備份</button>
+          <button class="btn-primary" onclick="showPage('page-import')">+ 新增會議</button>
+        </div>
       </div>
       <div id="fileList"></div>
     </div>
@@ -127,6 +132,50 @@
     if(pageId === 'page-list') renderFileList();
   }
 
+  // --- 🌟 新增：資料導入與導出功能 ---
+  function exportData() {
+    if (meetings.length === 0) return alert("目前沒有資料可以導出！");
+    const dataStr = JSON.stringify(meetings, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CIMA會議紀錄備份_${new Date().toLocaleDateString().replace(/\//g,'')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (!Array.isArray(importedData)) throw new Error("檔案格式不正確，必須是陣列。");
+        
+        let addedCount = 0;
+        const existingIds = new Set(meetings.map(m => m.id));
+        
+        importedData.forEach(newMtg => {
+          // 避免重複導入相同 ID 的會議
+          if (!existingIds.has(newMtg.id)) {
+            meetings.push(newMtg);
+            addedCount++;
+          }
+        });
+        
+        saveToLocal();
+        renderFileList();
+        alert(`✅ 成功導入 ${addedCount} 筆會議紀錄！\n(已自動跳過重複的檔案)`);
+      } catch (err) {
+        alert("❌ 導入失敗：" + err.message);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // 重置 input 讓下次可以選同一個檔
+  }
+
   function addAgendaBlock() {
     const div = document.createElement('div');
     div.style.cssText = "position:relative; margin-bottom:10px;";
@@ -142,6 +191,18 @@
     if (!fullText.trim()) return alert("請貼上內容！");
 
     const lines = fullText.split('\n');
+    
+    // --- 🌟 新增：讀取第一列非空白文字當作標題 ---
+    let firstLineTitle = "";
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        firstLineTitle = lines[i].trim();
+        break; // 找到第一行有字的就停止
+      }
+    }
+    // 防呆：如果真的找不到，給個預設名稱
+    if (!firstLineTitle) firstLineTitle = "會議紀錄_" + new Date().toLocaleDateString();
+
     const items = [];
     let curCat = "未分類";
     let curTopic = "";
@@ -153,6 +214,10 @@
     lines.forEach(line => {
       line = line.trim();
       if (!line) return;
+      
+      // 避免把剛抓出來的標題當成內文
+      if (line === firstLineTitle) return;
+
       if (catRegex.test(line)) {
         if (curTopic) items.push({ category: curCat, topic: curTopic, description: curDesc.trim(), transcript: '', summary: '' });
         curCat = line; curTopic = ""; curDesc = "";
@@ -165,7 +230,8 @@
     });
     if (curTopic) items.push({ category: curCat, topic: curTopic, description: curDesc.trim(), transcript: '', summary: '' });
 
-    const newMtg = { id: Date.now(), filename: "會議紀錄_" + new Date().toLocaleDateString(), items };
+    // 建立新會議並套用抓到的標題
+    const newMtg = { id: Date.now(), filename: firstLineTitle, items };
     meetings.push(newMtg);
     saveToLocal();
     openMeeting(newMtg.id);
@@ -173,7 +239,7 @@
 
   function renderFileList() {
     const list = document.getElementById('fileList');
-    list.innerHTML = meetings.length ? '' : '<p>無紀錄</p>';
+    list.innerHTML = meetings.length ? '' : '<p>無紀錄，請點擊新增會議。</p>';
     meetings.sort((a,b)=>b.id-a.id).forEach(m => {
       list.innerHTML += `<div class="file-item"><div><strong>${m.filename}</strong></div>
                          <div><button class="btn-primary" onclick="openMeeting(${m.id})">開啟</button>
@@ -227,27 +293,16 @@
     p.style.display = p.style.display === 'block' ? 'none' : 'block'; 
   }
 
-  // --- 🚀 關鍵修正：動態抓取分類 & 精準安插 ---
   function openAddModal() { 
     const mtg = meetings.find(m => m.id === currentMeetingId);
     const select = document.getElementById('modalCategory');
-    select.innerHTML = ''; // 清空選項
-
-    // 抓取目前這份會議中所有的分類 (過濾重複)
+    select.innerHTML = ''; 
     const uniqueCats = [...new Set(mtg.items.map(item => item.category))];
-    
-    uniqueCats.forEach(cat => {
-      select.innerHTML += `<option value="${cat}">${cat}</option>`;
-    });
-
-    // 防呆：如果會議裡剛好沒有「臨時動議」，我們補給他一個
+    uniqueCats.forEach(cat => { select.innerHTML += `<option value="${cat}">${cat}</option>`; });
     if (!uniqueCats.some(cat => cat.includes("肆") || cat.includes("臨時動議"))) {
       select.innerHTML += `<option value="肆、臨時動議">肆、臨時動議</option>`;
     }
-
-    // 預設選擇最後一個分類
     select.selectedIndex = select.options.length - 1;
-
     document.getElementById('modalTopicName').value = '';
     document.getElementById('addTopicModal').style.display = 'flex'; 
   }
@@ -262,7 +317,6 @@
     const mtg = meetings.find(m => m.id === currentMeetingId);
     const newItem = { category: cat, topic: top, description: "（現場臨時新增提案）", transcript: "", summary: "" };
 
-    // 尋找該分類的「最後一項」的位置
     let insertIdx = -1;
     for (let i = mtg.items.length - 1; i >= 0; i--) {
       if (mtg.items[i].category === cat) {
@@ -270,19 +324,10 @@
         break;
       }
     }
+    if (insertIdx !== -1) mtg.items.splice(insertIdx, 0, newItem);
+    else mtg.items.push(newItem);
 
-    // 如果找到分類，就安插在它後面；如果沒找到，才放到整個陣列最後面
-    if (insertIdx !== -1) {
-      mtg.items.splice(insertIdx, 0, newItem);
-    } else {
-      mtg.items.push(newItem);
-    }
-
-    saveToLocal(); 
-    renderSession(); 
-    closeAddModal();
-    
-    // 平滑滑動到剛才建立的新卡片
+    saveToLocal(); renderSession(); closeAddModal();
     setTimeout(() => {
       const newRenderIdx = mtg.items.indexOf(newItem);
       const targetCard = document.getElementById(`card-${newRenderIdx}`);
@@ -290,6 +335,7 @@
     }, 100);
   }
 
+  // --- 🌟 關鍵修復：絕不覆寫的語音暫存邏輯 ---
   function toggleRecord(idx) {
     const btn = document.getElementById(`rec-btn-${idx}`);
     const box = document.getElementById(`stt-${idx}`);
@@ -299,23 +345,54 @@
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SR();
-    recognition.lang = 'zh-TW'; recognition.continuous = true; recognition.interimResults = true;
-    let history = mtg.items[idx].transcript || "";
+    recognition.lang = 'zh-TW'; 
+    recognition.continuous = true; 
+    recognition.interimResults = true;
+    
+    // 將歷史文字鎖定在變數中，並確保最後有換行
+    let confirmedHistoryText = mtg.items[idx].transcript || "";
+    if (confirmedHistoryText && !confirmedHistoryText.endsWith('\n')) {
+      confirmedHistoryText += '\n';
+    }
 
-    recognition.onresult = (e) => {
-      let live = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) history += e.results[i][0].transcript + "。\n";
-        else live = e.results[i][0].transcript;
+    recognition.onresult = (event) => {
+      let newlyFinalized = "";
+      let liveText = "";
+
+      // 拆分「已定案」與「變動中」的句子
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          newlyFinalized += event.results[i][0].transcript + "。\n";
+        } else {
+          liveText += event.results[i][0].transcript;
+        }
       }
-      box.innerText = history + live;
-      mtg.items[idx].transcript = history + live;
+
+      // 如果有新的定案句子，正式加入歷史變數中 (永不消失)
+      if (newlyFinalized) {
+        confirmedHistoryText += newlyFinalized;
+      }
+
+      // 畫面顯示：永遠是 [歷史] + [目前正在變動的字]
+      const fullDisplay = confirmedHistoryText + liveText;
+      box.innerText = fullDisplay;
+      
+      // 同步存檔
+      mtg.items[idx].transcript = fullDisplay;
       saveToLocal();
       box.scrollTop = box.scrollHeight;
     };
-    recognition.onend = () => { btn.classList.remove('recording'); btn.innerText = "🎤 繼續錄音"; };
+    
+    recognition.onend = () => { 
+      btn.classList.remove('recording'); 
+      btn.innerText = "🎤 錄音討論"; 
+      isRecording = false; 
+    };
+    
     recognition.start();
-    isRecording = true; btn.classList.add('recording'); btn.innerText = "🛑 停止錄音";
+    isRecording = true; 
+    btn.classList.add('recording'); 
+    btn.innerText = "🛑 停止錄音";
   }
 
   async function generateSummary(idx) {
