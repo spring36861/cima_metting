@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>CIMA 數位會議紀錄系統1.1</title>
+  <title>CIMA 數位會議紀錄系統1.2</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
     body { font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; margin: 0; }
@@ -67,7 +67,9 @@
 </div>
 
 <script>
+  // 【重要】請替換為您的 GAS Web App URL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxybu-JD2_lqC0OWAZWAkDIJm0zAjkVXKRW0QhaKafsCG5M-BAYKbP9yrxZFq9IfOXd/exec";
+
   let meetings = JSON.parse(localStorage.getItem('cima_meetings')) || [];
   let currentMeetingId = null;
   let recognition = null;
@@ -168,7 +170,7 @@
   }
 
   // ==========================================
-  // 核心改進：累加式語音辨識
+  // 【完美修復】語音辨識：正確分離「已確定」與「變動中」文字
   // ==========================================
   function toggleRecord(index) {
     const btn = document.getElementById(`rec-btn-${index}`);
@@ -189,24 +191,37 @@
     recognition = new SpeechRecognition();
     recognition.lang = 'zh-TW';
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = true; // 允許回傳正在思考的字
 
-    // 重要：先獲取目前的歷史文字
-    let historyText = mtg.items[index].transcript || "";
-    if (historyText && !historyText.endsWith("\n")) historyText += "\n";
+    // 【關鍵 1】將之前存檔的逐字稿設為「不可撼動的歷史基準點」
+    let confirmedHistoryText = mtg.items[index].transcript || "";
+    if (confirmedHistoryText && !confirmedHistoryText.endsWith("\n")) {
+      confirmedHistoryText += "\n";
+    }
 
     recognition.onresult = (event) => {
-      let currentSessionText = "";
-      // 遍歷本次錄音會話中的所有結果
+      let finalSessionText = "";
+      let interimSessionText = "";
+
+      // 遍歷所有語音結果
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        currentSessionText += event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          // 【關鍵 2】如果這句話已經判定完畢，就放進 Final
+          finalSessionText += event.results[i][0].transcript;
+        } else {
+          // 如果還在變動，放進 Interim
+          interimSessionText += event.results[i][0].transcript;
+        }
       }
-      
-      // 累加：歷史 + 本次
-      const totalText = historyText + currentSessionText;
+
+      // 【關鍵 3】把剛剛「定案」的句子，正式加入歷史基準點
+      if (finalSessionText !== "") {
+        confirmedHistoryText += finalSessionText;
+      }
+
+      // 畫面與存檔：永遠是「歷史基準點」加上「正在變動的字」
+      const totalText = confirmedHistoryText + interimSessionText;
       box.innerText = totalText;
-      
-      // 即時儲存，防止中斷丟失
       mtg.items[index].transcript = totalText;
       saveToLocal();
       
