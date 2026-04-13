@@ -2,10 +2,10 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>CIMA 數位會議紀錄系統</title>
+  <title>CIMA 數位會議紀錄系統1.1</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
-    html { scroll-behavior: smooth; } /* 讓跳轉有平滑滑動效果 */
+    html { scroll-behavior: smooth; } 
     body { font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; margin: 0; }
     .container { max-width: 1000px; margin: auto; }
     
@@ -39,7 +39,6 @@
     .recording { animation: pulse 1s infinite alternate; background: #c62828 !important; }
     @keyframes pulse { from { opacity: 1; transform: scale(1); } to { opacity: 0.7; transform: scale(0.98); } }
 
-    /* --- 新增：左上角漂浮目錄樣式 --- */
     #toc-widget { position: fixed; top: 20px; left: 20px; z-index: 1000; display: none; }
     #toc-toggle { background: #333; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 14px; }
     #toc-toggle:hover { background: #555; }
@@ -49,6 +48,16 @@
     #toc-list li a { text-decoration: none; color: var(--primary); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #toc-list li a:hover { color: #d32f2f; font-weight: bold; }
     .toc-cat { font-weight: bold; color: #555; background: #f4f4f4; padding: 5px; margin-top: 10px; border-radius: 4px; }
+    
+    .agenda-block { position: relative; margin-bottom: 10px; }
+    .agenda-block textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    .remove-block-btn { position: absolute; top: 5px; right: 10px; background: transparent; color: #dc3545; border: none; font-size: 18px; cursor: pointer; padding: 0; }
+
+    /* --- 新增：手動加入議題的彈出視窗 --- */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+    .modal-box { background: white; padding: 25px; border-radius: 10px; width: 450px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .modal-box h3 { margin-top: 0; color: var(--primary); }
+    .modal-box select, .modal-box input { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
   </style>
 </head>
 <body>
@@ -57,6 +66,27 @@
   <button id="toc-toggle" onclick="toggleToc()">📑 展開議題導覽目錄</button>
   <div id="toc-panel">
     <ul id="toc-list"></ul>
+  </div>
+</div>
+
+<div id="addTopicModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>➕ 手動新增議題</h3>
+    <label style="font-size: 14px; color: #555;">請選擇要加入的分類大項：</label>
+    <select id="modalCategory">
+      <option value="壹、資訊系統廠商工作進度報告">壹、資訊系統廠商工作進度報告</option>
+      <option value="貳、代檢機構列管項目">貳、代檢機構列管項目</option>
+      <option value="參、討論議題">參、討論議題</option>
+      <option value="肆、臨時動議" selected>肆、臨時動議</option>
+    </select>
+    
+    <label style="font-size: 14px; color: #555;">請輸入議題名稱/案由：</label>
+    <input type="text" id="modalTopicName" placeholder="例如：新專案預算審核...">
+    
+    <div style="text-align: right; margin-top: 10px;">
+      <button class="btn-outline" onclick="closeAddModal()" style="margin-right: 10px;">取消</button>
+      <button class="btn-primary" onclick="confirmAddTopic()">確定新增</button>
+    </div>
   </div>
 </div>
 
@@ -80,10 +110,18 @@
 
   <div id="page-import" class="page">
     <div class="card">
-      <h2>貼上開會通知單</h2>
-      <textarea id="agendaInput" rows="12" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;" placeholder="請將議程全文貼於此處..."></textarea>
-      <br><br>
-      <button id="analyzeBtn" class="btn-primary" onclick="analyzeAgenda()" style="width: 100%; font-size: 16px;">🤖 開始 AI 解析並建檔</button>
+      <h2>分區塊貼上開會通知單</h2>
+      <p style="color: #666; font-size: 14px;">為了避免 AI 遺漏，建議將議程分成多個區塊貼上（例如：一個大項貼一個框）。</p>
+      
+      <div id="agenda-blocks-container">
+        <div class="agenda-block">
+          <textarea class="agendaInput" rows="6" placeholder="請貼上部分議程（例如：壹、資訊系統廠商工作進度報告...）"></textarea>
+        </div>
+      </div>
+      
+      <button class="btn-outline" onclick="addAgendaBlock()" style="width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 20px;">➕ 新增區塊</button>
+      
+      <button id="analyzeBtn" class="btn-primary" onclick="analyzeAgenda()" style="width: 100%; font-size: 16px;">🤖 將以上區塊合併送出，開始 AI 解析</button>
       <div id="loading" style="display:none; text-align:center; margin-top:10px; color:#0f4c81;">正在分析檔案，請稍候...</div>
     </div>
   </div>
@@ -92,8 +130,8 @@
     <h2 id="session-title" style="text-align: center; color: var(--primary); font-size: 28px;"></h2>
     <div id="session-content"></div>
     
-    <button class="btn-outline" onclick="addManualTopic()" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 30px;">
-      ➕ 手動新增臨時動議 / 議題
+    <button class="btn-outline" onclick="openAddModal()" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 30px;">
+      ➕ 手動新增議題 (可自選分類)
     </button>
   </div>
 </div>
@@ -111,7 +149,6 @@
 
   function saveToLocal() { localStorage.setItem('cima_meetings', JSON.stringify(meetings)); }
 
-  // 顯示或隱藏左上角漂浮目錄
   function toggleToc() {
     const panel = document.getElementById('toc-panel');
     const btn = document.getElementById('toc-toggle');
@@ -127,10 +164,7 @@
   function showPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
-    
-    // 只有在會議執行頁面才顯示漂浮目錄
     document.getElementById('toc-widget').style.display = (pageId === 'page-session') ? 'block' : 'none';
-    
     if(pageId === 'page-list') renderFileList();
     if(recognition && isRecording) { recognition.stop(); isRecording = false; }
   }
@@ -155,23 +189,49 @@
     if(confirm("確定刪除這筆會議紀錄嗎？")) { meetings = meetings.filter(m => m.id !== id); saveToLocal(); renderFileList(); }
   }
 
+  function addAgendaBlock() {
+    const container = document.getElementById('agenda-blocks-container');
+    const block = document.createElement('div');
+    block.className = 'agenda-block';
+    block.innerHTML = `
+      <textarea class="agendaInput" rows="6" placeholder="請繼續貼上下一段議程..."></textarea>
+      <button class="remove-block-btn" onclick="this.parentElement.remove()" title="移除此區塊">✖</button>
+    `;
+    container.appendChild(block);
+  }
+
   async function analyzeAgenda() {
-    const text = document.getElementById('agendaInput').value;
-    if (!text) return alert("請貼上議程！");
+    const inputs = document.querySelectorAll('.agendaInput');
+    let combinedText = "";
+    
+    inputs.forEach((input, index) => {
+      if(input.value.trim() !== "") {
+        combinedText += `\n\n【議程區塊 ${index + 1}】\n${input.value}`;
+      }
+    });
+
+    if (!combinedText) return alert("請至少在一個區塊中貼上議程！");
+    
     document.getElementById('loading').style.display = "block";
     document.getElementById('analyzeBtn').disabled = true;
+    
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ mode: 'ANALYZE', text: text })
+        body: JSON.stringify({ mode: 'ANALYZE', text: combinedText })
       });
       const data = await response.json();
       const items = data.items.map(item => ({...item, transcript: '', summary: ''}));
       const newMeeting = { id: Date.now(), filename: data.filename, items: items };
       meetings.push(newMeeting);
       saveToLocal();
-      document.getElementById('agendaInput').value = '';
+      
+      document.getElementById('agenda-blocks-container').innerHTML = `
+        <div class="agenda-block">
+          <textarea class="agendaInput" rows="6" placeholder="請貼上部分議程..."></textarea>
+        </div>`;
+        
       openMeeting(newMeeting.id);
     } catch (e) { alert("失敗：" + e.message); }
     finally { document.getElementById('loading').style.display = "none"; document.getElementById('analyzeBtn').disabled = false; }
@@ -179,24 +239,36 @@
 
   function openMeeting(id) { currentMeetingId = id; showPage('page-session'); renderSession(); }
 
-  // --- 手動新增臨時動議 ---
-  function addManualTopic() {
-    const topicName = prompt("請輸入新增的議題/動議名稱：", "臨時動議案件");
-    if (!topicName) return; // 按取消或沒輸入則中斷
+  // --- 改版：自選類別的彈出視窗邏輯 ---
+  function openAddModal() {
+    document.getElementById('modalTopicName').value = ''; // 清空輸入框
+    document.getElementById('addTopicModal').style.display = 'flex';
+  }
+
+  function closeAddModal() {
+    document.getElementById('addTopicModal').style.display = 'none';
+  }
+
+  function confirmAddTopic() {
+    const category = document.getElementById('modalCategory').value;
+    const topicName = document.getElementById('modalTopicName').value.trim();
+    
+    if (!topicName) return alert("請輸入議題名稱！");
 
     const mtg = meetings.find(m => m.id === currentMeetingId);
     mtg.items.push({
-      category: "肆、臨時動議", // 預設加入到臨時動議類別
+      category: category, 
       topic: topicName,
-      description: "（會議現場手動新增之議題）",
+      description: "（現場臨時新增提案）",
       transcript: "",
       summary: ""
     });
     
     saveToLocal();
-    renderSession(); // 重新渲染畫面
+    renderSession(); // 重新渲染畫面將其歸類到正確的大項下
+    closeAddModal(); // 關閉視窗
     
-    // 平滑滑動到最下方新建立的卡片
+    // 平滑滑動到剛才建立的卡片
     setTimeout(() => {
       const lastIndex = mtg.items.length - 1;
       document.getElementById(`topic-card-${lastIndex}`).scrollIntoView({ behavior: 'smooth' });
@@ -219,13 +291,13 @@
     contentDiv.innerHTML = '';
     tocList.innerHTML = '';
     
+    // 依序渲染各類別
     for (const [category, items] of Object.entries(grouped)) {
       contentDiv.innerHTML += `<h3 class="category-title">${category}</h3>`;
-      tocList.innerHTML += `<div class="toc-cat">${category}</div>`; // 目錄加入類別標題
+      tocList.innerHTML += `<div class="toc-cat">${category}</div>`; 
       
       items.forEach(item => {
         const i = item.originalIndex;
-        // 將每個卡片加上 ID，供目錄跳轉使用
         contentDiv.innerHTML += `
           <div class="topic-card" id="topic-card-${i}">
             <div class="topic-title">${item.topic}</div>
@@ -247,7 +319,6 @@
             </div>
           </div>`;
           
-          // 生成左上角目錄連結
           tocList.innerHTML += `<li><a href="#topic-card-${i}">▪ ${item.topic}</a></li>`;
       });
     }
