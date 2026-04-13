@@ -2,47 +2,32 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>CIMA 會議紀錄控管系統</title>
+  <title>CIMA 數位會議紀錄系統1.1</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
     body { font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; margin: 0; }
     .container { max-width: 1000px; margin: auto; }
-    
-    /* 導航列 */
     header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
     h1 { margin: 0; color: var(--primary); font-size: 24px; }
     button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-danger { background: #dc3545; color: white; }
     .btn-success { background: #28a745; color: white; }
-    
-    /* 頁面切換 */
     .page { display: none; }
     .page.active { display: block; }
-    
-    /* 卡片與列表 */
     .card { background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
     .file-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: #fff; }
-    
-    /* 會議紀錄頁面排版 */
-    .category-title { color: var(--primary); font-size: 22px; margin-top: 30px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
-    .topic-card { border-left: 4px solid var(--primary); padding: 20px; margin-top: 15px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 1px 5px rgba(0,0,0,0.05); }
-    .topic-title { font-weight: bold; font-size: 18px; margin-bottom: 10px; }
-    
-    /* 美化的說明區塊 */
-    .topic-desc { background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; color: #555; white-space: pre-wrap; margin-bottom: 15px; border: 1px solid #eee; }
-    
-    /* 雙欄工作區 (逐字稿 vs 摘要) */
-    .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-    .panel { display: flex; flex-direction: column; }
-    .panel h4 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
-    .transcript-box { background: #fffde7; border: 1px dashed #ffd600; padding: 10px; border-radius: 6px; min-height: 120px; font-size: 14px; white-space: pre-wrap; }
-    textarea.summary-box { width: 100%; min-height: 120px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 14px; resize: vertical; background: #fdfdfd; box-sizing: border-box; }
-    textarea.summary-box:focus { border-color: var(--primary); outline: none; }
-    
+    .category-title { color: var(--primary); font-size: 22px; margin-top: 40px; border-bottom: 2px solid #ddd; padding-bottom: 8px; background: #eee; padding-left: 15px; border-radius: 4px; }
+    .topic-card { border-left: 5px solid var(--primary); padding: 20px; margin-top: 20px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .topic-title { font-weight: bold; font-size: 19px; margin-bottom: 12px; color: #111; }
+    .topic-desc { background: #fdfdfd; padding: 18px; border-radius: 8px; font-size: 15px; color: #444; white-space: pre-wrap; margin-bottom: 20px; border: 1px solid #eaeeef; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02); }
+    .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
+    .panel h4 { margin: 0 0 10px 0; font-size: 14px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+    .transcript-box { background: #fffde7; border: 1px solid #ffe57f; padding: 15px; border-radius: 8px; min-height: 150px; font-size: 14px; white-space: pre-wrap; overflow-y: auto; max-height: 300px; }
+    textarea.summary-box { width: 100%; min-height: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 15px; font-size: 14px; resize: vertical; background: #fafafa; box-sizing: border-box; }
     .save-toast { font-size: 12px; color: #28a745; display: none; margin-left: 10px; }
-    .recording { animation: pulse 1s infinite alternate; background: #dc3545 !important; color: white !important; }
-    @keyframes pulse { from { opacity: 1; } to { opacity: 0.6; } }
+    .recording { animation: pulse 1s infinite alternate; background: #c62828 !important; }
+    @keyframes pulse { from { opacity: 1; transform: scale(1); } to { opacity: 0.7; transform: scale(0.98); } }
   </style>
 </head>
 <body>
@@ -76,261 +61,198 @@
   </div>
 
   <div id="page-session" class="page">
-    <h2 id="session-title" style="text-align: center; color: var(--primary);"></h2>
+    <h2 id="session-title" style="text-align: center; color: var(--primary); font-size: 28px;"></h2>
     <div id="session-content"></div>
   </div>
 </div>
 
 <script>
-  // 【重要】請替換為您的 GAS Web App URL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxybu-JD2_lqC0OWAZWAkDIJm0zAjkVXKRW0QhaKafsCG5M-BAYKbP9yrxZFq9IfOXd/exec";
-
-  // 系統狀態
   let meetings = JSON.parse(localStorage.getItem('cima_meetings')) || [];
   let currentMeetingId = null;
   let recognition = null;
+  let isRecording = false;
 
-  // 初始化
   renderFileList();
 
-  function saveToLocal() {
-    localStorage.setItem('cima_meetings', JSON.stringify(meetings));
-  }
+  function saveToLocal() { localStorage.setItem('cima_meetings', JSON.stringify(meetings)); }
 
   function showPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
     if(pageId === 'page-list') renderFileList();
+    if(recognition && isRecording) { recognition.stop(); isRecording = false; }
   }
 
-  // ==========================================
-  // 第一頁：檔案管理
-  // ==========================================
   function renderFileList() {
     const list = document.getElementById('fileList');
     list.innerHTML = '';
-    if (meetings.length === 0) {
-      list.innerHTML = '<p style="color:#777;">目前沒有任何會議紀錄。點擊右上方新增。</p>';
-      return;
-    }
+    if (meetings.length === 0) { list.innerHTML = '<p style="color:#777;">目前沒有紀錄。點擊右上方新增。</p>'; return; }
     meetings.sort((a,b) => b.id - a.id).forEach(mtg => {
       list.innerHTML += `
         <div class="file-item">
+          <div><strong>${mtg.filename}</strong><br><small>${new Date(mtg.id).toLocaleString()}</small></div>
           <div>
-            <strong>${mtg.filename}</strong> <br>
-            <small style="color:#666;">建立時間: ${new Date(mtg.id).toLocaleString()}</small>
-          </div>
-          <div>
-            <button class="btn-primary" onclick="openMeeting(${mtg.id})">開啟紀錄</button>
+            <button class="btn-primary" onclick="openMeeting(${mtg.id})">開啟</button>
             <button class="btn-danger" onclick="deleteMeeting(${mtg.id})">刪除</button>
           </div>
-        </div>
-      `;
+        </div>`;
     });
   }
 
   function deleteMeeting(id) {
-    if(confirm("確定要刪除這筆會議紀錄嗎？此動作無法復原。")) {
-      meetings = meetings.filter(m => m.id !== id);
-      saveToLocal();
-      renderFileList();
-    }
+    if(confirm("確定刪除嗎？")) { meetings = meetings.filter(m => m.id !== id); saveToLocal(); renderFileList(); }
   }
 
-  // ==========================================
-  // 第二頁：AI 解析匯入
-  // ==========================================
   async function analyzeAgenda() {
     const text = document.getElementById('agendaInput').value;
     if (!text) return alert("請貼上議程！");
-    
     document.getElementById('loading').style.display = "block";
     document.getElementById('analyzeBtn').disabled = true;
-
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ mode: 'ANALYZE', text: text })
       });
-      
       const data = await response.json();
-      if(data.error) throw new Error(data.error);
-
-      // 為每個議題加上 transcript 和 summary 空白欄位
       const items = data.items.map(item => ({...item, transcript: '', summary: ''}));
-      
       const newMeeting = { id: Date.now(), filename: data.filename, items: items };
       meetings.push(newMeeting);
       saveToLocal();
-      
       document.getElementById('agendaInput').value = '';
       openMeeting(newMeeting.id);
-
-    } catch (e) {
-      alert("解析失敗：" + e.message);
-    } finally {
-      document.getElementById('loading').style.display = "none";
-      document.getElementById('analyzeBtn').disabled = false;
-    }
+    } catch (e) { alert("失敗：" + e.message); }
+    finally { document.getElementById('loading').style.display = "none"; document.getElementById('analyzeBtn').disabled = false; }
   }
 
-  // ==========================================
-  // 第三頁：會議紀錄介面
-  // ==========================================
-  function openMeeting(id) {
-    currentMeetingId = id;
-    showPage('page-session');
-    renderSession();
-  }
+  function openMeeting(id) { currentMeetingId = id; showPage('page-session'); renderSession(); }
 
   function renderSession() {
     const mtg = meetings.find(m => m.id === currentMeetingId);
     document.getElementById('session-title').innerText = mtg.filename;
-    
-    // 將議題依照 Category (四大類別) 分組
     const grouped = {};
     mtg.items.forEach((item, index) => {
-      item.originalIndex = index; // 記錄原始陣列位置以便存檔
+      item.originalIndex = index;
       if (!grouped[item.category]) grouped[item.category] = [];
       grouped[item.category].push(item);
     });
-
     const contentDiv = document.getElementById('session-content');
     contentDiv.innerHTML = '';
-
-    // 依序渲染大標題與卡片
     for (const [category, items] of Object.entries(grouped)) {
       contentDiv.innerHTML += `<h3 class="category-title">${category}</h3>`;
-      
       items.forEach(item => {
         const i = item.originalIndex;
-        // 美化說明欄位，替換換行符號
-        const formattedDesc = item.description.replace(/\n/g, '<br>');
-        
         contentDiv.innerHTML += `
           <div class="topic-card">
             <div class="topic-title">${item.topic}</div>
-            <div class="topic-desc">${formattedDesc}</div>
-            
-            <div style="margin-bottom:10px;">
-              <button id="rec-btn-${i}" class="btn-danger" onclick="toggleRecord(${i})">🎤 錄音轉逐字稿</button>
-              <button class="btn-success" onclick="generateSummary(${i})">✨ AI 生成正式摘要</button>
+            <div class="topic-desc">${item.description}</div>
+            <div style="margin-bottom:15px;">
+              <button id="rec-btn-${i}" class="btn-danger" onclick="toggleRecord(${i})">🎤 開始錄音討論</button>
+              <button class="btn-success" onclick="generateSummary(${i})">✨ AI 產生摘要</button>
               <span id="toast-${i}" class="save-toast">✔️ 已自動存檔</span>
             </div>
-
             <div class="workspace">
               <div class="panel">
-                <h4>🗣️ 即時逐字稿 (原文保存)</h4>
-                <div id="stt-box-${i}" class="transcript-box">${item.transcript || '尚未錄音...'}</div>
+                <h4>🗣️ 討論逐字稿 (自動累加)</h4>
+                <div id="stt-box-${i}" class="transcript-box">${item.transcript || '等待錄音...'}</div>
               </div>
               <div class="panel">
-                <h4>📝 正式會議摘要 (可手動修改)</h4>
+                <h4>📝 AI 摘要與決議 (可手動修改)</h4>
                 <textarea id="summary-box-${i}" class="summary-box" onblur="saveSummary(${i})" oninput="showSaving(${i})">${item.summary}</textarea>
               </div>
             </div>
-          </div>
-        `;
+          </div>`;
       });
     }
   }
 
-  // --- 語音轉文字 (STT) ---
-  let recordingIndex = -1;
+  // ==========================================
+  // 核心改進：累加式語音辨識
+  // ==========================================
   function toggleRecord(index) {
     const btn = document.getElementById(`rec-btn-${index}`);
     const box = document.getElementById(`stt-box-${index}`);
     const mtg = meetings.find(m => m.id === currentMeetingId);
 
-    // 如果正在錄這個議題，就停止
-    if (recordingIndex === index) {
+    if (isRecording) {
       recognition.stop();
+      isRecording = false;
       btn.classList.remove('recording');
-      btn.innerText = "🎤 繼續錄音";
-      recordingIndex = -1;
+      btn.innerText = "🎤 繼續錄音討論";
       return;
     }
 
-    // 初始化語音 API
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("您的瀏覽器不支援語音辨識，請使用 Chrome。");
-    
-    if (recognition) recognition.stop(); // 停掉其他的
+    if (!SpeechRecognition) return alert("請使用 Chrome 瀏覽器。");
     
     recognition = new SpeechRecognition();
     recognition.lang = 'zh-TW';
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    btn.classList.add('recording');
-    btn.innerText = "🛑 停止錄音";
-    recordingIndex = index;
-    
-    // 每次錄音都接在原本的字尾端
-    let originalText = mtg.items[index].transcript ? mtg.items[index].transcript + "\n" : "";
+    // 重要：先獲取目前的歷史文字
+    let historyText = mtg.items[index].transcript || "";
+    if (historyText && !historyText.endsWith("\n")) historyText += "\n";
 
     recognition.onresult = (event) => {
-      let interim = "";
+      let currentSessionText = "";
+      // 遍歷本次錄音會話中的所有結果
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        interim += event.results[i][0].transcript;
+        currentSessionText += event.results[i][0].transcript;
       }
-      box.innerText = originalText + interim;
-      // 即時存入陣列
-      mtg.items[index].transcript = originalText + interim; 
+      
+      // 累加：歷史 + 本次
+      const totalText = historyText + currentSessionText;
+      box.innerText = totalText;
+      
+      // 即時儲存，防止中斷丟失
+      mtg.items[index].transcript = totalText;
       saveToLocal();
+      
+      // 自動滾動到底部
+      box.scrollTop = box.scrollHeight;
     };
+
+    recognition.onend = () => {
+      btn.classList.remove('recording');
+      btn.innerText = "🎤 繼續錄音討論";
+      isRecording = false;
+    };
+
     recognition.start();
+    isRecording = true;
+    btn.classList.add('recording');
+    btn.innerText = "🛑 停止錄音";
   }
 
-  // --- 呼叫 AI 生成摘要 ---
   async function generateSummary(index) {
     const mtg = meetings.find(m => m.id === currentMeetingId);
-    const transcript = mtg.items[index].transcript;
-    
-    if (!transcript) return alert("請先錄製逐字稿，AI 才有內容可以摘要喔！");
-
+    if (!mtg.items[index].transcript) return alert("沒有逐字稿內容！");
     const summaryBox = document.getElementById(`summary-box-${index}`);
-    summaryBox.value = "AI 正在思考與撰寫摘要中，請稍候...";
-    
+    summaryBox.value = "AI 摘要中...";
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ 
-          mode: 'SUMMARIZE', 
-          topic: mtg.items[index].topic,
-          transcript: transcript 
-        })
+        body: JSON.stringify({ mode: 'SUMMARIZE', topic: mtg.items[index].topic, transcript: mtg.items[index].transcript })
       });
       const data = await response.json();
-      
       summaryBox.value = data.summary;
       mtg.items[index].summary = data.summary;
       saveToLocal();
-      
-    } catch (e) {
-      summaryBox.value = "生成失敗：" + e.message;
-    }
+    } catch (e) { summaryBox.value = "錯誤：" + e.message; }
   }
 
-  // --- 手動修改自動存檔 ---
-  let saveTimeout;
-  function showSaving(index) {
-    // 使用者正在打字時隱藏勾勾
-    document.getElementById(`toast-${index}`).style.display = 'none';
-  }
-  
+  function showSaving(index) { document.getElementById(`toast-${index}`).style.display = 'none'; }
   function saveSummary(index) {
-    // 當使用者滑鼠點擊外面 (onblur) 時自動儲存
     const mtg = meetings.find(m => m.id === currentMeetingId);
     mtg.items[index].summary = document.getElementById(`summary-box-${index}`).value;
     saveToLocal();
-    
     const toast = document.getElementById(`toast-${index}`);
     toast.style.display = 'inline-block';
-    setTimeout(() => toast.style.display = 'none', 2000); // 兩秒後隱藏勾勾
+    setTimeout(() => toast.style.display = 'none', 2000);
   }
-
 </script>
 </body>
 </html>
