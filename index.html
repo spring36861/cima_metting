@@ -2,43 +2,82 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>CIMA 會議紀錄控管系統1.2</title>
+  <title>CIMA 會議紀錄控管系統</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; line-height: 1.6; }
-    .container { max-width: 900px; margin: auto; }
-    .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 20px; }
-    textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 15px; font-size: 14px; box-sizing: border-box; }
-    button { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
-    .primary-btn { background: #007bff; color: white; width: 100%; margin-top: 10px; font-size: 16px; }
-    .primary-btn:hover { background: #0056b3; }
+    :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
+    body { font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; margin: 0; }
+    .container { max-width: 1000px; margin: auto; }
     
-    .topic-card { border-left: 5px solid #007bff; padding: 15px; margin-bottom: 20px; background: #fff; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .category-tag { font-size: 12px; color: #666; background: #e9ecef; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 8px; }
-    .topic-title { font-weight: bold; font-size: 17px; color: #1a1a1a; margin-bottom: 10px; }
-    .topic-content { font-size: 14px; color: #444; white-space: pre-wrap; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+    /* 導航列 */
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+    h1 { margin: 0; color: var(--primary); font-size: 24px; }
+    button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-success { background: #28a745; color: white; }
     
-    .stt-box { background: #fffde7; border: 1px dashed #ffd600; padding: 10px; margin-top: 10px; font-style: italic; min-height: 40px; border-radius: 4px; display: none; }
-    .controls { display: flex; gap: 10px; }
-    .btn-speak { background: #28a745; color: white; }
-    .btn-record { background: #dc3545; color: white; }
-    .recording { animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    /* 頁面切換 */
+    .page { display: none; }
+    .page.active { display: block; }
+    
+    /* 卡片與列表 */
+    .card { background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: #fff; }
+    
+    /* 會議紀錄頁面排版 */
+    .category-title { color: var(--primary); font-size: 22px; margin-top: 30px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+    .topic-card { border-left: 4px solid var(--primary); padding: 20px; margin-top: 15px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 1px 5px rgba(0,0,0,0.05); }
+    .topic-title { font-weight: bold; font-size: 18px; margin-bottom: 10px; }
+    
+    /* 美化的說明區塊 */
+    .topic-desc { background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; color: #555; white-space: pre-wrap; margin-bottom: 15px; border: 1px solid #eee; }
+    
+    /* 雙欄工作區 (逐字稿 vs 摘要) */
+    .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+    .panel { display: flex; flex-direction: column; }
+    .panel h4 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+    .transcript-box { background: #fffde7; border: 1px dashed #ffd600; padding: 10px; border-radius: 6px; min-height: 120px; font-size: 14px; white-space: pre-wrap; }
+    textarea.summary-box { width: 100%; min-height: 120px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 14px; resize: vertical; background: #fdfdfd; box-sizing: border-box; }
+    textarea.summary-box:focus { border-color: var(--primary); outline: none; }
+    
+    .save-toast { font-size: 12px; color: #28a745; display: none; margin-left: 10px; }
+    .recording { animation: pulse 1s infinite alternate; background: #dc3545 !important; color: white !important; }
+    @keyframes pulse { from { opacity: 1; } to { opacity: 0.6; } }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <div class="card">
-    <h2>1. 貼上會議議程文字</h2>
-    <textarea id="agendaInput" rows="10" placeholder="直接在此貼上議程全文..."></textarea>
-    <button id="analyzeBtn" class="primary-btn" onclick="analyzeAgenda()">🤖 AI 結構化分類與拆解</button>
+  <header>
+    <h1>CIMA 數位會議紀錄系統</h1>
+    <div id="nav-buttons">
+      <button class="btn-primary" onclick="showPage('page-list')">首頁(檔案管理)</button>
+    </div>
+  </header>
+
+  <div id="page-list" class="page active">
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0;">歷史會議紀錄</h2>
+        <button class="btn-primary" onclick="showPage('page-import')">+ 新增會議解析</button>
+      </div>
+      <div id="fileList"></div>
+    </div>
   </div>
 
-  <div id="loading" style="display:none; text-align:center;">AI 正在解析長文內容，請稍候...</div>
+  <div id="page-import" class="page">
+    <div class="card">
+      <h2>貼上開會通知單</h2>
+      <textarea id="agendaInput" rows="12" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;" placeholder="請將議程全文貼於此處..."></textarea>
+      <br><br>
+      <button id="analyzeBtn" class="btn-primary" onclick="analyzeAgenda()" style="width: 100%; font-size: 16px;">🤖 開始 AI 解析並建檔</button>
+      <div id="loading" style="display:none; text-align:center; margin-top:10px; color:#0f4c81;">正在分析檔案，請稍候...</div>
+    </div>
+  </div>
 
-  <div id="meetingArea" style="display:none;">
-    <h2>2. 會議導引與紀錄</h2>
-    <div id="topicList"></div>
+  <div id="page-session" class="page">
+    <h2 id="session-title" style="text-align: center; color: var(--primary);"></h2>
+    <div id="session-content"></div>
   </div>
 </div>
 
@@ -46,6 +85,61 @@
   // 【重要】請替換為您的 GAS Web App URL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxybu-JD2_lqC0OWAZWAkDIJm0zAjkVXKRW0QhaKafsCG5M-BAYKbP9yrxZFq9IfOXd/exec";
 
+  // 系統狀態
+  let meetings = JSON.parse(localStorage.getItem('cima_meetings')) || [];
+  let currentMeetingId = null;
+  let recognition = null;
+
+  // 初始化
+  renderFileList();
+
+  function saveToLocal() {
+    localStorage.setItem('cima_meetings', JSON.stringify(meetings));
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    if(pageId === 'page-list') renderFileList();
+  }
+
+  // ==========================================
+  // 第一頁：檔案管理
+  // ==========================================
+  function renderFileList() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+    if (meetings.length === 0) {
+      list.innerHTML = '<p style="color:#777;">目前沒有任何會議紀錄。點擊右上方新增。</p>';
+      return;
+    }
+    meetings.sort((a,b) => b.id - a.id).forEach(mtg => {
+      list.innerHTML += `
+        <div class="file-item">
+          <div>
+            <strong>${mtg.filename}</strong> <br>
+            <small style="color:#666;">建立時間: ${new Date(mtg.id).toLocaleString()}</small>
+          </div>
+          <div>
+            <button class="btn-primary" onclick="openMeeting(${mtg.id})">開啟紀錄</button>
+            <button class="btn-danger" onclick="deleteMeeting(${mtg.id})">刪除</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function deleteMeeting(id) {
+    if(confirm("確定要刪除這筆會議紀錄嗎？此動作無法復原。")) {
+      meetings = meetings.filter(m => m.id !== id);
+      saveToLocal();
+      renderFileList();
+    }
+  }
+
+  // ==========================================
+  // 第二頁：AI 解析匯入
+  // ==========================================
   async function analyzeAgenda() {
     const text = document.getElementById('agendaInput').value;
     if (!text) return alert("請貼上議程！");
@@ -56,83 +150,187 @@
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
-        body: JSON.stringify({ agendaText: text })
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ mode: 'ANALYZE', text: text })
       });
+      
       const data = await response.json();
-      renderTopics(data);
+      if(data.error) throw new Error(data.error);
+
+      // 為每個議題加上 transcript 和 summary 空白欄位
+      const items = data.items.map(item => ({...item, transcript: '', summary: ''}));
+      
+      const newMeeting = { id: Date.now(), filename: data.filename, items: items };
+      meetings.push(newMeeting);
+      saveToLocal();
+      
+      document.getElementById('agendaInput').value = '';
+      openMeeting(newMeeting.id);
+
     } catch (e) {
-      alert("解析失敗：" + e);
+      alert("解析失敗：" + e.message);
     } finally {
       document.getElementById('loading').style.display = "none";
       document.getElementById('analyzeBtn').disabled = false;
     }
   }
 
-  function renderTopics(topics) {
-    const list = document.getElementById('topicList');
-    list.innerHTML = '';
-    document.getElementById('meetingArea').style.display = "block";
+  // ==========================================
+  // 第三頁：會議紀錄介面
+  // ==========================================
+  function openMeeting(id) {
+    currentMeetingId = id;
+    showPage('page-session');
+    renderSession();
+  }
 
-    topics.forEach((item, index) => {
-      const card = document.createElement('div');
-      card.className = 'topic-card';
-      card.innerHTML = `
-        <span class="category-tag">${item.category}</span>
-        <div class="topic-title">${item.topic}</div>
-        <div class="topic-content">${item.description}</div>
-        <div class="controls">
-          <button class="btn-speak" onclick="speak('${item.topic}。${item.description}')">🔊 朗讀引導</button>
-          <button class="btn-record" id="rec-btn-${index}" onclick="toggleRecord(${index})">🎤 開始討論(錄音)</button>
-        </div>
-        <div class="stt-box" id="stt-${index}">即時轉錄文字將顯示於此...</div>
-      `;
-      list.appendChild(card);
+  function renderSession() {
+    const mtg = meetings.find(m => m.id === currentMeetingId);
+    document.getElementById('session-title').innerText = mtg.filename;
+    
+    // 將議題依照 Category (四大類別) 分組
+    const grouped = {};
+    mtg.items.forEach((item, index) => {
+      item.originalIndex = index; // 記錄原始陣列位置以便存檔
+      if (!grouped[item.category]) grouped[item.category] = [];
+      grouped[item.category].push(item);
     });
+
+    const contentDiv = document.getElementById('session-content');
+    contentDiv.innerHTML = '';
+
+    // 依序渲染大標題與卡片
+    for (const [category, items] of Object.entries(grouped)) {
+      contentDiv.innerHTML += `<h3 class="category-title">${category}</h3>`;
+      
+      items.forEach(item => {
+        const i = item.originalIndex;
+        // 美化說明欄位，替換換行符號
+        const formattedDesc = item.description.replace(/\n/g, '<br>');
+        
+        contentDiv.innerHTML += `
+          <div class="topic-card">
+            <div class="topic-title">${item.topic}</div>
+            <div class="topic-desc">${formattedDesc}</div>
+            
+            <div style="margin-bottom:10px;">
+              <button id="rec-btn-${i}" class="btn-danger" onclick="toggleRecord(${i})">🎤 錄音轉逐字稿</button>
+              <button class="btn-success" onclick="generateSummary(${i})">✨ AI 生成正式摘要</button>
+              <span id="toast-${i}" class="save-toast">✔️ 已自動存檔</span>
+            </div>
+
+            <div class="workspace">
+              <div class="panel">
+                <h4>🗣️ 即時逐字稿 (原文保存)</h4>
+                <div id="stt-box-${i}" class="transcript-box">${item.transcript || '尚未錄音...'}</div>
+              </div>
+              <div class="panel">
+                <h4>📝 正式會議摘要 (可手動修改)</h4>
+                <textarea id="summary-box-${i}" class="summary-box" onblur="saveSummary(${i})" oninput="showSaving(${i})">${item.summary}</textarea>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
   }
 
-  // 語音朗讀 (TTS)
-  function speak(text) {
-    window.speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'zh-TW';
-    window.speechSynthesis.speak(msg);
-  }
-
-  // 語音轉文字 (STT) 簡單實作
-  let recognition;
+  // --- 語音轉文字 (STT) ---
+  let recordingIndex = -1;
   function toggleRecord(index) {
     const btn = document.getElementById(`rec-btn-${index}`);
-    const box = document.getElementById(`stt-${index}`);
+    const box = document.getElementById(`stt-box-${index}`);
+    const mtg = meetings.find(m => m.id === currentMeetingId);
 
-    if (btn.classList.contains('recording')) {
+    // 如果正在錄這個議題，就停止
+    if (recordingIndex === index) {
       recognition.stop();
       btn.classList.remove('recording');
-      btn.innerText = "🎤 開始討論(錄音)";
+      btn.innerText = "🎤 繼續錄音";
+      recordingIndex = -1;
       return;
     }
 
+    // 初始化語音 API
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("瀏覽器不支援語音辨識");
-
+    if (!SpeechRecognition) return alert("您的瀏覽器不支援語音辨識，請使用 Chrome。");
+    
+    if (recognition) recognition.stop(); // 停掉其他的
+    
     recognition = new SpeechRecognition();
     recognition.lang = 'zh-TW';
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    box.style.display = "block";
     btn.classList.add('recording');
-    btn.innerText = "🛑 停止並存檔";
+    btn.innerText = "🛑 停止錄音";
+    recordingIndex = index;
+    
+    // 每次錄音都接在原本的字尾端
+    let originalText = mtg.items[index].transcript ? mtg.items[index].transcript + "\n" : "";
 
     recognition.onresult = (event) => {
-      let resultText = "";
+      let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        resultText += event.results[i][0].transcript;
+        interim += event.results[i][0].transcript;
       }
-      box.innerText = resultText;
+      box.innerText = originalText + interim;
+      // 即時存入陣列
+      mtg.items[index].transcript = originalText + interim; 
+      saveToLocal();
     };
-    
     recognition.start();
   }
+
+  // --- 呼叫 AI 生成摘要 ---
+  async function generateSummary(index) {
+    const mtg = meetings.find(m => m.id === currentMeetingId);
+    const transcript = mtg.items[index].transcript;
+    
+    if (!transcript) return alert("請先錄製逐字稿，AI 才有內容可以摘要喔！");
+
+    const summaryBox = document.getElementById(`summary-box-${index}`);
+    summaryBox.value = "AI 正在思考與撰寫摘要中，請稍候...";
+    
+    try {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ 
+          mode: 'SUMMARIZE', 
+          topic: mtg.items[index].topic,
+          transcript: transcript 
+        })
+      });
+      const data = await response.json();
+      
+      summaryBox.value = data.summary;
+      mtg.items[index].summary = data.summary;
+      saveToLocal();
+      
+    } catch (e) {
+      summaryBox.value = "生成失敗：" + e.message;
+    }
+  }
+
+  // --- 手動修改自動存檔 ---
+  let saveTimeout;
+  function showSaving(index) {
+    // 使用者正在打字時隱藏勾勾
+    document.getElementById(`toast-${index}`).style.display = 'none';
+  }
+  
+  function saveSummary(index) {
+    // 當使用者滑鼠點擊外面 (onblur) 時自動儲存
+    const mtg = meetings.find(m => m.id === currentMeetingId);
+    mtg.items[index].summary = document.getElementById(`summary-box-${index}`).value;
+    saveToLocal();
+    
+    const toast = document.getElementById(`toast-${index}`);
+    toast.style.display = 'inline-block';
+    setTimeout(() => toast.style.display = 'none', 2000); // 兩秒後隱藏勾勾
+  }
+
 </script>
 </body>
 </html>
