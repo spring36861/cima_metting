@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>CIMA 數位會議紀錄系統1.2</title>
+  <title>CIMA 數位會議紀錄系統</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
     body { font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; margin: 0; }
@@ -156,7 +156,7 @@
             </div>
             <div class="workspace">
               <div class="panel">
-                <h4>🗣️ 討論逐字稿 (自動累加)</h4>
+                <h4>🗣️ 討論逐字稿</h4>
                 <div id="stt-box-${i}" class="transcript-box">${item.transcript || '等待錄音...'}</div>
               </div>
               <div class="panel">
@@ -169,9 +169,6 @@
     }
   }
 
-  // ==========================================
-  // 【完美修復】語音辨識：正確分離「已確定」與「變動中」文字
-  // ==========================================
   function toggleRecord(index) {
     const btn = document.getElementById(`rec-btn-${index}`);
     const box = document.getElementById(`stt-box-${index}`);
@@ -191,41 +188,34 @@
     recognition = new SpeechRecognition();
     recognition.lang = 'zh-TW';
     recognition.continuous = true;
-    recognition.interimResults = true; // 允許回傳正在思考的字
+    recognition.interimResults = true; 
 
-    // 【關鍵 1】將之前存檔的逐字稿設為「不可撼動的歷史基準點」
+    // 取出保險箱內的歷史紀錄
     let confirmedHistoryText = mtg.items[index].transcript || "";
-    if (confirmedHistoryText && !confirmedHistoryText.endsWith("\n")) {
-      confirmedHistoryText += "\n";
-    }
 
     recognition.onresult = (event) => {
       let finalSessionText = "";
       let interimSessionText = "";
 
-      // 遍歷所有語音結果
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          // 【關鍵 2】如果這句話已經判定完畢，就放進 Final
-          finalSessionText += event.results[i][0].transcript;
+          // 每次判定為完整句子時，自動加上句號並換行
+          finalSessionText += event.results[i][0].transcript + "。\n";
         } else {
-          // 如果還在變動，放進 Interim
           interimSessionText += event.results[i][0].transcript;
         }
       }
 
-      // 【關鍵 3】把剛剛「定案」的句子，正式加入歷史基準點
+      // 如果有新的定案句子，就放入保險箱
       if (finalSessionText !== "") {
         confirmedHistoryText += finalSessionText;
       }
 
-      // 畫面與存檔：永遠是「歷史基準點」加上「正在變動的字」
+      // 畫面上顯示：保險箱歷史 + 正在辨識中的字
       const totalText = confirmedHistoryText + interimSessionText;
       box.innerText = totalText;
       mtg.items[index].transcript = totalText;
       saveToLocal();
-      
-      // 自動滾動到底部
       box.scrollTop = box.scrollHeight;
     };
 
@@ -241,11 +231,18 @@
     btn.innerText = "🛑 停止錄音";
   }
 
+  // 加上 async 確保不卡住前端
   async function generateSummary(index) {
     const mtg = meetings.find(m => m.id === currentMeetingId);
     if (!mtg.items[index].transcript) return alert("沒有逐字稿內容！");
+    
     const summaryBox = document.getElementById(`summary-box-${index}`);
-    summaryBox.value = "AI 摘要中...";
+    const btn = document.querySelectorAll('.btn-success')[index]; // 找到按鈕
+    
+    summaryBox.value = "🤖 AI 正在深度分析多人討論內容並撰寫摘要，請稍候...";
+    btn.disabled = true; // 防止重複點擊
+    btn.innerText = "處理中...";
+
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
@@ -253,10 +250,16 @@
         body: JSON.stringify({ mode: 'SUMMARIZE', topic: mtg.items[index].topic, transcript: mtg.items[index].transcript })
       });
       const data = await response.json();
+      
       summaryBox.value = data.summary;
       mtg.items[index].summary = data.summary;
       saveToLocal();
-    } catch (e) { summaryBox.value = "錯誤：" + e.message; }
+    } catch (e) { 
+      summaryBox.value = "產生摘要失敗：" + e.message; 
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "✨ AI 產生摘要";
+    }
   }
 
   function showSaving(index) { document.getElementById(`toast-${index}`).style.display = 'none'; }
