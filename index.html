@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CIMA 數位會議紀錄系統 2.1</title>
+  <title>CIMA 數位會議紀錄系統 2.2</title>
   <style>
     :root { --primary: #0f4c81; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --border: #e0e0e0; }
     html { scroll-behavior: smooth; } 
@@ -62,11 +62,7 @@
   <div class="modal-box">
     <h3>➕ 手動新增議題</h3>
     <select id="modalCategory">
-      <option value="壹、資訊系統廠商工作進度報告">壹、資訊系統廠商工作進度報告</option>
-      <option value="貳、代檢機構列管項目">貳、代檢機構列管項目</option>
-      <option value="參、討論議題">參、討論議題</option>
-      <option value="肆、臨時動議" selected>肆、臨時動議</option>
-    </select>
+      </select>
     <input type="text" id="modalTopicName" placeholder="輸入議題案由...">
     <div style="text-align: right;">
       <button onclick="closeAddModal()" style="margin-right: 10px; padding: 8px 15px; border: 1px solid #ccc; background: white; border-radius: 4px;">取消</button>
@@ -139,7 +135,6 @@
     document.getElementById('agenda-blocks-container').appendChild(div);
   }
 
-  // --- 🚀 關鍵修正：更精準的 Regex 規則 ---
   function analyzeAgendaCode() {
     const inputs = document.querySelectorAll('.agendaInput');
     let fullText = "";
@@ -153,9 +148,6 @@
     let curDesc = "";
 
     const catRegex = /^(壹|貳|參|肆|伍|陸)[、\s]+(.*)/;
-    
-    // 【修正點】：移除了 [\d]+，確保 1. 2. 3. 不會被誤判為大標題。
-    // 只有「中文數字」或特定的「114-X-X」或明確寫著「案由：」的才會變成獨立標題。
     const topicRegex = /^([一二三四五六七八九十]+)[、.]\s*(案由[：:])?|^\d{3}-\d+-\d+|^案由[：:]/;
 
     lines.forEach(line => {
@@ -235,18 +227,66 @@
     p.style.display = p.style.display === 'block' ? 'none' : 'block'; 
   }
 
-  function openAddModal() { document.getElementById('addTopicModal').style.display = 'flex'; }
+  // --- 🚀 關鍵修正：動態抓取分類 & 精準安插 ---
+  function openAddModal() { 
+    const mtg = meetings.find(m => m.id === currentMeetingId);
+    const select = document.getElementById('modalCategory');
+    select.innerHTML = ''; // 清空選項
+
+    // 抓取目前這份會議中所有的分類 (過濾重複)
+    const uniqueCats = [...new Set(mtg.items.map(item => item.category))];
+    
+    uniqueCats.forEach(cat => {
+      select.innerHTML += `<option value="${cat}">${cat}</option>`;
+    });
+
+    // 防呆：如果會議裡剛好沒有「臨時動議」，我們補給他一個
+    if (!uniqueCats.some(cat => cat.includes("肆") || cat.includes("臨時動議"))) {
+      select.innerHTML += `<option value="肆、臨時動議">肆、臨時動議</option>`;
+    }
+
+    // 預設選擇最後一個分類
+    select.selectedIndex = select.options.length - 1;
+
+    document.getElementById('modalTopicName').value = '';
+    document.getElementById('addTopicModal').style.display = 'flex'; 
+  }
+
   function closeAddModal() { document.getElementById('addTopicModal').style.display = 'none'; }
+  
   function confirmAddTopic() {
     const cat = document.getElementById('modalCategory').value;
     const top = document.getElementById('modalTopicName').value.trim();
-    if (!top) return;
+    if (!top) return alert("請輸入議題名稱！");
+
     const mtg = meetings.find(m => m.id === currentMeetingId);
-    mtg.items.push({ category: cat, topic: top, description: "（現場臨時新增提案）", transcript: "", summary: "" });
-    saveToLocal(); renderSession(); closeAddModal();
+    const newItem = { category: cat, topic: top, description: "（現場臨時新增提案）", transcript: "", summary: "" };
+
+    // 尋找該分類的「最後一項」的位置
+    let insertIdx = -1;
+    for (let i = mtg.items.length - 1; i >= 0; i--) {
+      if (mtg.items[i].category === cat) {
+        insertIdx = i + 1;
+        break;
+      }
+    }
+
+    // 如果找到分類，就安插在它後面；如果沒找到，才放到整個陣列最後面
+    if (insertIdx !== -1) {
+      mtg.items.splice(insertIdx, 0, newItem);
+    } else {
+      mtg.items.push(newItem);
+    }
+
+    saveToLocal(); 
+    renderSession(); 
+    closeAddModal();
+    
+    // 平滑滑動到剛才建立的新卡片
     setTimeout(() => {
-      const lastIndex = mtg.items.length - 1;
-      document.getElementById(`card-${lastIndex}`).scrollIntoView({ behavior: 'smooth' });
+      const newRenderIdx = mtg.items.indexOf(newItem);
+      const targetCard = document.getElementById(`card-${newRenderIdx}`);
+      if (targetCard) targetCard.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   }
 
